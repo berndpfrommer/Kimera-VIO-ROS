@@ -222,56 +222,21 @@ bool RosBaseDataProvider::parseCameraData(StereoCalibration* stereo_calib) {
     // Parse distortion
     std::vector<double> d_coeff;
     nh_private_.getParam(camera_name + "distortion_coefficients", d_coeff);
-    cv::Mat distortion_coeff;
 
-    // TODO(Toni): this is super prone to errors, do not rely only on d_coeff
-    // size to know what distortion params we are using...
-    switch (d_coeff.size()) {
-      case (4): {
-        CHECK_EQ(camera_param_i.distortion_model_, "radial-tangential");
-        // If given 4 coefficients
-        // TODO(Toni): why 'or'? Should be only one no?
-        ROS_INFO(
-            "Using radtan or equidistant model (4 coefficients) for camera %d",
-            i);
-        distortion_coeff = cv::Mat::zeros(1, 4, CV_64F);
-        distortion_coeff.at<double>(0, 0) = d_coeff[0];  // k1
-        distortion_coeff.at<double>(0, 1) = d_coeff[1];  // k2
-        distortion_coeff.at<double>(0, 3) = d_coeff[2];  // p1 or k3
-        distortion_coeff.at<double>(0, 4) = d_coeff[3];  // p2 or k4
-        break;
-    }
-      case (5): {
-        CHECK_EQ(camera_param_i.distortion_model_, "radial-tangential");
-        // If given 5 coefficients
-        ROS_INFO("Using radtan model (5 coefficients) for camera %d", i);
-        distortion_coeff = cv::Mat::zeros(1, 5, CV_64F);
-        for (int k = 0; k < 5; k++) {
-          distortion_coeff.at<double>(0, k) = d_coeff[k];  // k1, k2, k3, p1, p2
-        }
-        break;
-    }
-    default: { // otherwise
-        ROS_FATAL("Unsupported distortion format.");
-    }
+    CHECK(DistortionModel::is_valid(distortion_model, d_coeff.size()));
+    camera_param_i.distortion_ = DistortionModel::make(distortion_model,
+                                                       intrinsics, d_coeff);
+
+    // create cv::Mat of matching size and content
+    cv::Mat distortion_coeff = cv::Mat::zeros(1, d_coeff.size(), CV_64F);
+    for (int k = 0; k < d_coeff.size(); k++) {
+      distortion_coeff.at<double>(0, k) = d_coeff[k];  
     }
 
     camera_param_i.distortion_coeff_ = distortion_coeff;
 
     // TODO(unknown): add skew (can add switch statement when parsing
     // intrinsics)
-    // TODO(TONI): wtf! before we parse 5 params if radial-tangential,
-    // but now we only use 4? We don't care or what?
-    camera_param_i.calibration_ =
-        gtsam::Cal3DS2(intrinsics[0],                       // fx
-                       intrinsics[1],                       // fy
-                       0.0,                                 // skew
-                       intrinsics[2],                       // u0
-                       intrinsics[3],                       // v0
-                       distortion_coeff.at<double>(0, 0),   //  k1
-                       distortion_coeff.at<double>(0, 1),   //  k2
-                       distortion_coeff.at<double>(0, 3),   //  p1
-                       distortion_coeff.at<double>(0, 4));  //  p2
 
     if (i == 0) {
       stereo_calib->left_camera_info_ = camera_param_i;
