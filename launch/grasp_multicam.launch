@@ -1,0 +1,47 @@
+<launch>
+  <arg name="dataset_name" value="grasp_multicam"/>
+  <arg name="verbosity"    default="0" />
+
+  <!-- Set online to true if you use rosbag play or sensor stream -->
+  <arg name="online" default="true" />
+  <!-- Set use_sim_time to true if you use rosbag with clock argument -->
+  <param name="use_sim_time" value="true"/>
+  <!-- Set log_output to true and SparkVio will log output of all modules to
+       the log_output_path location. -->
+  <arg name="log_output" default="true"/>
+  <arg name="log_output_path"
+    default="$(find kimera_vio_ros)/output_logs/$(arg dataset_name)"
+       if="$(arg log_output)"/>
+  <!-- Set to true and specify gt_topic if you want to log ground-truth data -->
+  <arg name="log_gt_data" default="false"/>
+  <arg name="gt_topic" if="$(arg log_gt_data)"
+       default="/vicon/firefly_sbx/firefly_sbx"/>
+
+  <arg name="use_lcd"   default="false"/>
+  <arg name="visualize" default="false"/>
+
+  <!-- Change rosbag path if online argument is false -->
+  <arg name="rosbag_path" default="/data-ssd/grasp_multicam/ovc/11-00-28/2018-11-09-11-00-28.bag"
+    unless="$(arg online)"/>
+
+  <!-- Frame IDs -->
+  <arg name="base_link_frame_id" value="base_link"/>
+  <!-- ros topics -->
+  <arg name="left_cam_topic"    value="/ovc/cam_0/image_raw"/>
+  <arg name="right_cam_topic"   default="/ovc/cam_1/image_raw"/>
+  <arg name="imu_topic"         default="/ovc/imu"/>
+
+  <!-- Launch static TF node from IMU to Cam0 for Euroc -->
+  <!-- TODO(Toni): this can be done programatically now, using the parsed
+  calibration files -->
+  <node pkg="tf" type="static_transform_publisher" name="left_cam_broadcaster"
+    args="-0.0216401454975 -0.064676986768 0.00981073058949
+    -0.0077071797555374275 0.010499323370587278 0.7017528002919717 0.7123014606689537
+    $(arg base_link_frame_id) cam0 100"/>
+  <arg name="left_cam_frame_id"  value="ovc/cam_0"/>
+  <arg name="right_cam_frame_id"  value="ovc/cam_1"/>
+
+  <!-- Launch actual pipeline -->
+  <include file="$(find kimera_vio_ros)/launch/kimera_vio_ros.launch"
+    pass_all_args="true"/>
+</launch>
